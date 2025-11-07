@@ -1,0 +1,14 @@
+---
+title: "Get to know"
+output: html_document
+---
+
+## Descriptive plots to get to know data
+### 1. Tomb parameter
+``` {r 1}
+library(readxl)
+tomb_parameter <- read_excel("Data/raw/Statistics project LMU_tomb parameters_Irene")
+
+```
+
+
