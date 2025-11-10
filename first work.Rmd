@@ -19,6 +19,7 @@ Clean the data:
 - delete single entries for T46, T56, T62
 - create entries for them as 1 tomb but with difference MNIs (as project partner wants)
 - delete irrelevant tombs (only Amfissa, and Elateia T31, T36, T46, T50, T56, T62, T67)
+- impute MNI 20 for T67 as project partner estimated
 
 ``` {r tp}
 tomb_parameter <- read_excel("Data/raw/Statistics project LMU_tomb parameters_Irene Hoegner_new.xlsx", range = "A2:N12")
@@ -29,7 +30,7 @@ combined_tombs <- tomb_parameter |> slice(rep(10, 4)) |> mutate(
 tomb_parameter <- rbind(tomb_parameter, combined_tombs)
 tomb_parameter <- tomb_parameter |> rename(Tomb = 1, MNI = 2, `analysed individuals` = 12) |>
   slice(-c(4, 5, 7, 8, 10)) |> mutate(MNI = as.integer(MNI))
-tomb_parameter
+tomb_parameter$MNI[5] <- 20
 ```
 
 The important info in this dataset: "MNI" and "after merging samples from same individual" (**minimum # individuals** vs **actual successful analysed # individual**), since if we don't consider the ratio between them, the result could be bias.
@@ -278,7 +279,45 @@ Comment:
 - Maybe unnecessary 
 
 
+## Model
+### Research question 1
+Develop and validate statistical models to predict the difference between observed and potential relatedness, using tomb parameters (length of use, estimated number of burials, sample success rate) as predictor variables, while accounting for potential confounding factors.
 
+
+Core idea: ratio model. Model the number of related individuals out of estimated burials (proportion of related individuals):
+
+- Use tomb_parameter, merging the number of related pairs
+- Predictors: length of use, proportion of analysed individual 
+- confounder: skeletal element (use proportion to eliminating bias causing by absolute number)
+
+
+``` {r rs1}
+related_pairs <- binary_kr |> group_by(Tomb1, Rel_group) |> summarize(sum(num_pairs)) |>
+  filter(Rel_group == "Related")
+related_pairs
+
+# Now I merge the # related pairs manually
+rs1 <- tomb_parameter |> mutate(related_pairs = c(81, 1, 18, 13, 1, rep(82, 4)))
+# Create relative number for skeletal element and # analysed individual
+rs1 <- rs1 |> mutate(
+  prop_petrousbones = `petrous bones` / (`petrous bones` + teeth + `talus/phalanx` + `other`),
+  prop_teeth = teeth / (`petrous bones` + teeth + `talus/phalanx` + `other`),
+  prop_talus = `talus/phalanx` / (`petrous bones` + teeth + `talus/phalanx` + `other`),
+  prop_other = other / (`petrous bones` + teeth + `talus/phalanx` + `other`),
+  prop_analysedind = `analysed individuals` / MNI
+)
+rs1
+
+# Modelling
+model1 <- glm(cbind(related_pairs, MNI - related_pairs) ~ `length of use of tomb` + prop_analysedind + prop_petrousbones + prop_teeth + prop_talus + prop_other,
+    family = binomial(link = "logit"), data = rs1)
+summary(model1)
+
+```
+
+
+### Research question 2
+Build predictive models to estimate relatedness patterns using individual-level covariates (sex, age and skeletal element of sample), considering that some of these factors may be confounded with DNA preservation quality and sampling success
 
 
 
